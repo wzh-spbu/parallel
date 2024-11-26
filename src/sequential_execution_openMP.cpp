@@ -1,12 +1,12 @@
 // sequential_execution_openMP.cpp
-
+#include <map>
 #include <iostream>
 #include <vector>
 #include <omp.h>
 #include <fstream>
 #include "matrix_operations_openMP.h"
 #include <time.h>
-
+#include <cmath>
 double compute_error(const Matrix& result, const Matrix& expected_result, int N) {
     double error = 0.0;
     for (int i = 0; i < N * N; ++i) {
@@ -56,99 +56,77 @@ double computeMatrixExpression(int N, Matrix& A) {
 
 int main() {
     std::cout << "Program started." << std::endl;
-    int N = 800;
-    std::cout << "N = "<< N <<std::endl;
     int max_threads = 32;
     Matrix A_1;
-    std::vector<double> execution_times(max_threads + 1, 0.0);
-    std::vector<double> speed_up(max_threads + 1, 0.0);
- 
-    omp_set_num_threads(1);
-    double T1 = computeMatrixExpression(N, A_1);
-    std::cout << "1-thread execution time: " << T1 << " seconds." << std::endl;
-    double abs_error = compute_error(A_1, A_1, N);
-    double rel_error = relative_error(A_1, A_1, N);
+    std::map<int, std::vector<double>> execution_times; // 每个 N 对应的线程运行时间
+    std::map<int, std::vector<double>> speed_ups;       // 每个 N 对应的线程加速比
+    std::map<int, std::vector<double>> absolute_errors;  // 每个 N 对应的线程绝对误差
+    std::map<int, std::vector<double>> relative_errors;  // 每个 N 对应的线程相对误差
 
-    execution_times[1] = T1;
-    speed_up[1] = 1;
+    for(int N = 800;N <= 1500;N = N + 100){
+        std::cout << "N = "<< N <<std::endl;
+        std::vector<double> times;
+        std::vector<double> speedups;
+        std::vector<double> abs_errors;    // 保存绝对误差
+        std::vector<double> rel_errors;    // 保存相对误差
 
-/*
-    Matrix A_2;
-    omp_set_num_threads(2);
-    double T2 = computeMatrixExpression(N, A_2);
-    std::cout << "2-thread execution time: " <<T2<< " seconds." << std::endl;
-    abs_error = compute_error(A_1, A_2, N);
-    rel_error = relative_error(A_1, A_2, N);
-    std::cout<< ", Absolute Error (wiht T1): " << abs_error
-                << ", Relative Error (wiht T1): " << rel_error 
-                <<"Speed up(Sp) :"<< T1 / T2<< std::endl;
+        omp_set_num_threads(1);
+        double T1 = computeMatrixExpression(N, A_1);
+        std::cout << "1-thread execution time: " << T1 << " seconds." << std::endl;
+        times.push_back(T1);
+        speedups.push_back(1);
+        abs_errors.push_back(0); 
+        rel_errors.push_back(0);
 
-    Matrix A_4;
-    omp_set_num_threads(4);
-    double T4 = computeMatrixExpression(N, A_4);
-    std::cout << "4-thread execution time: " <<T4<< " seconds." << std::endl;
-    abs_error = compute_error(A_1, A_4, N);
-    rel_error = relative_error(A_1, A_4, N);
-    std::cout<< ", Absolute Error (wiht T1): " << abs_error
-                << ", Relative Error (wiht T1): " << rel_error 
-                <<"Speed up(Sp) :"<< T1 / T4<< std::endl;
+        for(int i = 2; i <= max_threads ; i*=2){
+            Matrix A;
+            omp_set_num_threads(i);
+            double T = computeMatrixExpression(N, A);
+            times.push_back(T);
+
+            std::cout<< i << "-thread execution time: " <<T<< " seconds." << std::endl;
+            double abs_error = compute_error(A_1, A, N); // 多线程绝对误差
+            double rel_error = relative_error(A_1, A, N); // 多线程相对误差
+            abs_errors.push_back(abs_error);
+            rel_errors.push_back(rel_error);
+
+            double speedup = T1 / T;
+            speedups.push_back(speedup);
+
+            std::cout<< ", Absolute Error (wiht 1-thread): " << abs_error
+                    << ", Relative Error (wiht 1-thread): " << rel_error 
+                    <<", Speed up(Sp) :"<< speedup<< std::endl;   
+        }
+        execution_times[N] = times;
+        speed_ups[N] = speedups;
+        absolute_errors[N] = abs_errors;
+        relative_errors[N] = rel_errors;
+    }   
+
     
-    Matrix A_8;
-    omp_set_num_threads(8);
-    double T8 = computeMatrixExpression(N, A_8);
-    std::cout << "8-thread execution time: " <<T8<< " seconds." << std::endl;
-    abs_error = compute_error(A_1, A_8, N);
-    rel_error = relative_error(A_1, A_8, N);
-    std::cout<< ", Absolute Error (wiht T1): " << abs_error
-                << ", Relative Error (wiht T1): " << rel_error 
-                <<"Speed up(Sp) :"<< T1 / T8<< std::endl;
-
-    Matrix A_16;
-    omp_set_num_threads(16);
-    double T16 = computeMatrixExpression(N, A_16);
-    std::cout << "16-thread execution time: " <<T16<< " seconds." << std::endl;
-    abs_error = compute_error(A_1, A_16, N);
-    rel_error = relative_error(A_1, A_16, N);
-    std::cout<< ", Absolute Error (wiht T1): " << abs_error
-                << ", Relative Error (wiht T1): " << rel_error 
-                <<"Speed up(Sp) :"<< T1 / T16<< std::endl;
     
-    Matrix A_32;
-    omp_set_num_threads(32);
-    double T32 = computeMatrixExpression(N, A_32);
-    std::cout << "16-thread execution time: " <<T32<< " seconds." << std::endl;
-    abs_error = compute_error(A_1, A_32, N);
-    rel_error = relative_error(A_1, A_32, N);
-    std::cout<< ", Absolute Error (wiht T1): " << abs_error
-                << ", Relative Error (wiht T1): " << rel_error 
-                <<"Speed up(Sp) :"<< T1 / T32<< std::endl;
-*/       
-   
-    for(int i = 2; i <= max_threads ; i*=2){
-        Matrix A;
-        omp_set_num_threads(i);
-        double T = computeMatrixExpression(N, A);
-        execution_times[i] = T;
-        std::cout<< i << "-thread execution time: " <<T<< " seconds." << std::endl;
-
-        double abs_error= compute_error(A_1, A, N);
-        double rel_error = relative_error(A_1, A, N);
-        double speedup = T1 / T;
-        speed_up[i] = speedup;
-
-        std::cout<< ", Absolute Error (wiht T1): " << abs_error
-                << ", Relative Error (wiht T1): " << rel_error 
-                <<", Speed up(Sp) :"<< speedup<< std::endl;
-    }
     
     std::ofstream outfile("speedup_results.txt");
     if (outfile.is_open()) {
-        outfile << "Threads\tExecution Time\tSpeedup\n";
-        for (int i = 1; i <= max_threads; i *= 2) {
-            outfile << i << "\t" << execution_times[i] << "\t" << speed_up[i] << "\n";
+    outfile << "N\tThreads\tExecution Time\tSpeedup\tAbsolute Error\tRelative Error\n";
+    for (const auto& [N, times] : execution_times) {
+        const auto& speedups = speed_ups.at(N);
+        const auto& abs_errors = absolute_errors.at(N);
+        const auto& rel_errors = relative_errors.at(N);
+
+        size_t num_threads = times.size();
+        for (size_t i = 0; i < num_threads; ++i) {
+            outfile << N << "\t"                
+                    << std::pow(2, i) << "\t"          
+                    << times[i] << "\t"
+                    << speedups[i] << "\t"
+                    << abs_errors[i] << "\t"
+                    << rel_errors[i] << "\n";
         }
+    }
+
         outfile.close();
-        std::cout << "Saved to 'speedup_results.txt'." << std::endl;
+        std::cout << "Results successfully saved to 'speedup_results.txt'." << std::endl;
     } else {
         std::cerr << "Failed to save results to file." << std::endl;
     }
